@@ -13,16 +13,15 @@
   --green:#22B573;--cream:#FFF7E8;--spring:cubic-bezier(.34,1.56,.64,1);--smooth:cubic-bezier(.22,1,.36,1);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-/* ===== Ukuran game di LMS: ubah dua nilai ini bila perlu ===== */
-:root{--game-w:100%;--game-h:220px}
-html,body{margin:0;overflow:hidden;background:#16428c}
+/* Ukuran: lebar 100%, tinggi 9:16 tapi tidak melebihi tinggi layar (dihitung ulang oleh JS) */
+html,body{margin:0;overflow:hidden;background:#E61A23}
 body{font-family:'Nunito',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color:var(--ink);
   -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;overscroll-behavior:none}
 button{font-family:inherit;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent;color:inherit}
 textarea,input{-webkit-user-select:text;user-select:text;font-family:inherit}
 
 /* ---------- App frame ---------- */
-#app{position:relative;width:var(--game-w);height:var(--game-h);overflow:hidden;
+#app{position:relative;width:100%;height:min(177.78vw,100vh);overflow:hidden;
   background:radial-gradient(120% 80% at 10% 0%,#2f78dd 0%,transparent 55%),radial-gradient(90% 70% at 100% 100%,rgba(229,50,45,.45) 0%,transparent 60%),#16428c}
 #app::before{content:'';position:absolute;inset:0;background-image:radial-gradient(rgba(255,255,255,.08) 2px,transparent 2.5px);background-size:28px 28px}
 #stage{position:absolute;left:50%;top:50%;width:720px;height:1280px;overflow:hidden;background:#F8EDD6;
@@ -524,8 +523,36 @@ setLogos(document);
 const stage=$('#stage'),sceneEl=$('#scene'),fxEl=$('#fx'),uiEl=$('#ui'),dragLayer=$('#dragLayer');
 let SCALE=1;
 function isTyping(){const a=document.activeElement;return !!a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA');}
+/* Tinggi layar perangkat: jendela teratas bila bisa diakses, kalau tidak pakai ukuran layar */
+function screenH(){
+  let h=0;
+  try{h=window.top.innerHeight;}catch(e){try{h=window.parent.innerHeight;}catch(e2){}}
+  if(!h||h<320){const sh=(window.screen&&screen.availHeight)||0;h=Math.max(innerHeight,sh?Math.min(sh,1100):700);}
+  return h;
+}
+let lastAppH=0,frameTries=0;
+function sizeApp(){
+  const app=$('#app');
+  const W=document.documentElement.clientWidth||innerWidth;
+  const H=Math.max(320,Math.min(Math.round(W*16/9),screenH()-8));
+  if(Math.abs(H-lastAppH)<2)return;
+  lastAppH=H;app.style.height=H+'px';
+  growFrame(H);
+}
+/* Bila halaman ini berada di iframe yang sama origin (misal H5P Iframe Embedder),
+   perbesar iframe-nya agar game tampil penuh satu layar. Aman bila tidak diizinkan. */
+function growFrame(H){
+  try{
+    const fe=window.frameElement;if(!fe)return;
+    fe.style.height=H+'px';fe.style.minHeight=H+'px';fe.setAttribute('height',H);fe.setAttribute('scrolling','no');
+    const P=window.parent;
+    if(P&&P.H5P&&P.H5P.instances&&P.H5P.trigger)P.H5P.instances.forEach(i=>{try{P.H5P.trigger(i,'resize');}catch(e){}});
+    if(frameTries++<4)setTimeout(()=>{try{if(Math.abs(fe.getBoundingClientRect().height-H)>2){fe.style.height=H+'px';fe.style.minHeight=H+'px';}}catch(e){}},300);
+  }catch(e){}
+}
 function fit(force){
   if(!force&&isTyping())return;
+  sizeApp();
   const box=$('#app').getBoundingClientRect(),W=box.width||innerWidth,H=box.height||innerHeight;
   const s=Math.min(W/720,H/1280);SCALE=s;
   stage.style.transform=`translate(-50%,-50%) scale(${s})`;
